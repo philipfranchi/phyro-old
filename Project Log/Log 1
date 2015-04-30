@@ -1,0 +1,14 @@
+Philip Franchi-Pereira
+4/8/15
+
+Get git/bitbucket - Create a git page to store your code, taking advantage of version control in the process
+
+wrapper function to make sure _write is doing its buisness - sometimes the write function wont write all the bits, so just run a while loop to keep it going
+
+10,0000 times for the testing 2^0 up until about 2^21 - Pictures are about 2^21, so we should monitor how long that takes to send and recieve
+
+Make a histogram - plot the data in a histogram
+
+Do the reverse (1 byte from the fluke, 2 megs from pc) - normally the pc sends the 2^21 bytes. now have the pc send 1 byte and recieve 2^21
+
+
