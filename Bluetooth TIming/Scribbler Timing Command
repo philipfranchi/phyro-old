@@ -1,0 +1,13 @@
+#NEW FLUKE COMMAND
+
+int fluke_return_bytes(struct rfcomm_client *btclient){
+
+ ret = read_a2d(0, &raw, NULL);
+ if(ret) {
+  flukelog("ERROR: %s read_a2d failed\n", __FUNCTION__);
+  return(-1);
+ }
+ #Write a single char into the buffer
+ bluetooth_putch(btclient, 's'Z);
+
+}
