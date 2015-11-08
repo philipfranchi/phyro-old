@@ -296,7 +296,7 @@ int read_port(char* buf, int size, int fd){
                 if(ret <= 0){
                         printf("Read returned %d with error %d: %s\n",ret,errno,strerror(errno));
                         timer++;
-                        if(timer>size){
+                        if(timer>100){
                                 return -1;
                         }
                 }
