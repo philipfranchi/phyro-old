@@ -7,10 +7,10 @@ INCLUDES = -Iarm-include
 LFLAGS = -Larm-lib
 LIBS = -ljpeg -lm
 
-all: phyro.so
+all: phyroC.so
 
-phyro.so:	    pcam.o  pfluke2.o pgpio.o pmisc.o
-		$(CC) -shared -Wall -o phyro.so  pfluke2.o pgpio.o pcam.o pmisc.o $(LIBS) 
+phyroC.so:	    pcam.o  pfluke2.o pgpio.o pmisc.o
+		$(CC) -shared -Wall -o phyroC.so  pfluke2.o pgpio.o pcam.o pmisc.o $(LIBS) 
 
 
 pfluke2.o:	    pfluke2.c phyro.h
@@ -22,4 +22,4 @@ pgpio.o:		pgpio.c phyro.h
 pmisc.o:		pmisc.c phyro.h
 		$(CC) $(CFLAGS) $(INCLUDES) -c pmisc.c
 clean:
-		rm -f phyro.so *.o
+		rm -f phyroC.so *.o
