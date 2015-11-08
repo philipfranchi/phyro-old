@@ -102,7 +102,45 @@ SET_RESET_SCRIBBLER2=154 # hard reset scribbler2
 SET_SCRIB_BATCH=155  # upload scribbler2 firmware
 GET_ROBOT_ID=156
 
-
+scribblerCom = [
+	GET_ALL,
+	GET_ALL_BINARY,
+	GET_LIGHT_LEFT,
+	GET_LIGHT_CENTER,
+	GET_LIGHT_RIGHT,
+	GET_LIGHT_ALL,
+	GET_IR_LEFT,
+	GET_IR_RIGHT,
+	GET_IR_ALL,
+	GET_LINE_LEFT,
+	GET_LINE_RIGHT,
+	GET_LINE_ALL,
+	GET_STATE,
+	GET_NAME1,
+	GET_NAME2,
+	GET_STALL,
+	GET_INFO,
+	GET_DATA,
+	GET_BATTERY,
+	SET_LED_LEFT_ON,
+	SET_LED_LEFT_OFF,
+	SET_LED_CENTER_ON,
+	SET_LED_CENTER_OFF,
+	SET_LED_RIGHT_ON,
+	SET_LED_RIGHT_OFF,
+	SET_LED_ALL_ON,
+	SET_LED_ALL_OFF,
+	SET_LED_ALL,
+	SET_MOTORS_OFF,
+	SET_MOTORS,
+	SET_NAME1, 
+	SET_NAME2,   # set name2 byte
+	SET_LOUD,
+	SET_QUIET,
+	SET_SPEAKER,
+	SET_SPEAKER_2	
+	]
+dongleCom = []
 
 #library_path = "/home/phil/Work/Phyro/phyroC.so"
 library_path = "/root/test/phyro.so"
@@ -174,36 +212,61 @@ class Writer:
 		if (toWrite.type() == int):
 			toWrite = [toWrite]
 
-		DEBUG("		Write called with com " + str(comByte) + " and args: " + str(toWrite[1:]) )
-		DEBUG("		write to scrib")
-		ret = self.scribWrite(toWrite,None)
-
+		DEBUG("    Write called with com " + str(comByte) + " and args: " + str(toWrite[1:]) )
+		if(self.onboard == False):
+			#ret = self.ser.write(comByte)
+			print("COMING SOON")
+		else:	
+			if(comByte in scribblerCom):
+				DEBUG("	write to scrib")
+				ret = self.scribWrite(toWrite,None)
+			elif(comByte in dongleCom):
+				DEBUG("DONGLE DONGLE")
+			else:
+				DEBUG("NOOOO")
 		return ret
 
 
 	def scribWrite(self,com, nbytes=9):
 
-		DEBUG("    Scrib Write called with arg com: " + str(com[0]) + " and bytes: "+ str(com[1:]))
-		toWrite = ""
-		for c in com:
-        	toWrite += chr(c)
-		if(len(com) < 9):
-        		for i in range(9-len(com)):
-        			toWrite += chr(ord('0'))
-		if(nbytes == None):
-                nbytes = 9
+                DEBUG("    Scrib Write called with arg com: " + str(com[0]) + " and bytes: "+ str(com[1:]))
+                toWrite = ""
+                for c in com:
+                        toWrite += chr(c)
+
+                if(len(com) < 9):
+                        for i in range(9-len(com)):
+                                toWrite += chr(ord('0'))
+                if(nbytes == None):
+                        nbytes = 9
                 n = c_int(int(nbytes))
+                DEBUG("    CWRITE passed: "+ str(toWrite) + "," +str(n) +"," + str(self.fd))
                 writeRes = self.serialLib.write_to_port(toWrite,n,self.fd)
 
-		return writeRes
+                return writeRes
 
-	def read(self, nbytes = 9):
-		DEBUG("Called read for this many bytes: " + str(nbytes))
-		ret = self.scribRead(nbytes)
-		DEBUG("Read these values: " + str(ret))
-		return ret
 
-	def scribRead(self, nbytes = 9):
+
+	def readOLD(self, nbytes = 20):
+		read_port = self.serialLib.read_port
+		read_port.argtypes = [c_int,c_int]
+		read_port.restpye = POINTER(c_char_p)
+		
+		res = read_port(c_int(nbytes),c_int(self.fd))
+		
+		for c in res:
+			print c
+		return res
+		'''		
+		DEBUG("Called Read for: " + str(nbytes))
+		readRet= self.serialLib.read_port(nbytes,self.fd)
+		DEBUG("Scrib Read says: " + str(readRet))
+		return readRet
+		'''
+	def read(self, nbytes = 20):
+		return self.scribRead(nbytes)
+
+	def scribRead(self, nbytes = 20):
 		read_port = self.serialLib.read_port
 		read_port.argtypes = [c_char_p,c_int,c_int]
 		read_port.restpye = c_int
@@ -213,27 +276,9 @@ class Writer:
 		readRet  = read_port(buf,c_int(nbytes),c_int(self.fd))
 		for c in buf.raw:
 			ret.append(ord(c))
+		DEBUG("Read these values: " + str(ret))
 		return ret 
 	
-	#
-	#Fluke Functions!!
-	#
-
-	def setLEDFront(self,value):
-		value = int(min(max(value, 0), 1))
-		if(isTrue(value)):
-			self.serialLib.fluke_set_led_on()
-		else:
-			self.serialLib.fluke_set_led_off()
-	def setLEDBack(self, value):
-		if value > 1:
-			value = 1
-		elif value <= 0:
-			value = 0
-		else:
-			value = int(float(value) * (255 - 170) + 170) # scale
-		self.serialLib.fluke_set_bright_led(c_char_p(str(value))
-
 def init(serial_port):
 
 	global writer
@@ -249,26 +294,24 @@ def motors(leftValue, rightValue):
 	"""
 	trans = (rightValue + leftValue) / 2.0
 	rotate = (rightValue - leftValue) / 2.0
-	move(trans, rotate)
-	#Returns None
+	return move(trans, rotate)
+	
 def move(trans, rotate):
 	DEBUG("    Move called with parameters " + str(trans) + " , " + str(rotate))
 	scrib._lastTranslate = trans
 	scrib._lastRotate = rotate
-	adjustSpeed()
-	#returns none
+	return adjustSpeed()
+	#return writer.read(PACKET_LENGTH)
 
 def stop():
 	scrib._lastTranslate = 0
 	scrib._lastRotate = 0
-	writer.write([SET_MOTORS_OFF],PACKET_LENGTH)
-	writer.read(PACKET_LENGTH)
+	return writer.write([SET_MOTORS_OFF],9)
+
 def hardStop():
 	scrib._lastTranslate = 0
 	scrib._lastRotate = 0
 	writer.write([SET_MOTORS_OFF])
-	writer.read(PACKET_LENGTH)
-	#return none
     #scrib._read(Scribbler.PACKET_LENGTH) # read echo
     #scrib._lastSensors = self._read(11) # single bit sensors
 
@@ -288,15 +331,16 @@ def adjustSpeed():
 	rightPower = (right + 1.0) * 100.0
 
 	DEBUG("    Adjust Speed called with values "+ str(left) + " , " + str(right))
-	writer.write([SET_MOTORS, int(rightPower), int(leftPower)]))
-	writer.read(PACKET_LENGTH)
+	ret = str(writer.write([SET_MOTORS, int(rightPower), int(leftPower)]))
+	DEBUG("    Writer returned: " + ret)
+
+	#writer.read(PACKET_LENGTH) #Catch that echo
 
 def turnRight(speed, timeout = None):
 	ret = move(0,-speed)
 	if(timeout != None):
 		time.sleep(timeout)
 	return ret
-
 def turnLeft(spee, timeout = None):
 	ret = move(0, speed)
 	if(timeout != None):
@@ -321,7 +365,7 @@ def beep(duration, frequency1, frequency2=None):
         for (f1, f2) in zip(frequency1, frequency2):
         	return writeBeep(duration, f1, f2)
     else:
-	writeBeep(duration, frequency1, frequency2)
+	return writeBeep(duration, frequency1, frequency2)
 
 def writeBeep(dur, _freq1, _freq2):
 	duration = int(dur*1000)
@@ -359,36 +403,29 @@ def get(sensor = "all", *position):
 		c = string.join([chr(x) for x in c if "0" <= chr(x) <= "z"], '').strip()
 		return c
 	elif(sensor == "password"):
-		c = _get(GET_PASS1, 8)
-		c += _get(GET_PASS2, 8)
+		c = _get(Scribbler.GET_PASS1, 8)
+		c += _get(Scribbler.GET_PASS2, 8)
 		c = string.join([chr(x) for x in c if "0" <= chr(x) <= "z"], '').strip()
 		return c
 	elif(sensor == "volume"):
 		return scrib.volume
 
 	elif(sensor == "battery"):
-		#returns a float
 		return getBattery()
 
 	elif(sensor == "blob"):
-		#returns a 3 tuple 
 		return "blob"
 	else:
 		if(len(position)==0):
 			if(sensor == "light"):
-				#returns a 3 tuple
 				return _get(GET_LIGHT_ALL, 6, "word")
 			elif(sensor == "line"):
-				#returns a 2 tuple
 				return _get(GET_LINE_ALL, 2)
 			elif(sensor == "ir"):
-				#returns 2 tuple
 				return _get(GET_IR,2)
 			elif(sensor == "obstacle"):
-							#returns a 3 tupple
                     		return [getObstacle("left"), getObstacle("center"), getObstacle("right")]
                 	elif(sensor == "bright"):
-                			#returns a three tuple 
                     		return [getBright("left"), getBright("middle"), getBright("right")]
 			elif sensor == "all":
 				retval = getAll() # returned as bytes
@@ -408,31 +445,30 @@ def getAll():
 
 def getBattery():
 	writer.write([GET_BATTERY])
-	writer.read(PACKET_LENGTH)
+	val = writer.read(PACKET_LENGTH)
 	return read_2byte()
 
 def identifyRobot():
 	writer.write([GET_ROBOT_ID])
-	writer.read(PACKET_LENGTH + 11)
+	ret = writer.read(PACKET_LENGTH + 11)
 	return ret
 
 def getIR():
 	writer.write([GET_IR_ALL])
 	writer.read(PACKET_LENGTH)
-	return writer.read(2)
+	writer.read(2)
 
 def getObstacle(self, value=None):
 	if value == None:
 		return 	get("obstacle")           
 	if value in ["left", 0]:
-                writer.write([GET_DONGLE_L_IR])
-    elif value in ["middle", "center", 1]:
-        writer.write([GET_DONGLE_C_IR])
-    elif value in ["right", 2]:
-		writer.write([GET_DONGLE_R_IR])
-	echo = writer.read(PACKET_LENGTH)
-    retval = read_2byte()
-    return retval  
+                writer.write(GET_DONGLE_L_IR)
+        elif value in ["middle", "center", 1]:
+        	writer.write(GET_DONGLE_C_IR)
+        elif value in ["right", 2]:
+		writer.write(GET_DONGLE_R_IR)
+        retval = read_2byte()
+        return retval  
 
 def set(item, position, value = None):
         item = item.lower()
@@ -510,12 +546,10 @@ def set(item, position, value = None):
             raise ("invalid set item name: '%s'" % item)
 
 
-def setLEDFront(value):
-	writer.setLEDFront(value)
-
-def setLEDBack(value):
-    writer.setLEDBack(value)
-
+def setLEDFront(pos):
+	DEBUG(str(pos))
+def setLEDBack(pos):
+	DEBUG(str(pos))
 def setWhiteBalance(pos):
 	DEBUG(str(pos))
 def setIRPower(pos):
@@ -564,6 +598,13 @@ def randomNumber():
     Returns a number between 0 (inclusive) and 1 (exclusive).
     """
     return random.random()
+
+def ask(*args):
+	"""
+	Doesnt do anything for now
+	"""
+
+	return None 
 #------------------------------
 #Utility Functions
 #------------------------------

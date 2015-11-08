@@ -1,0 +1,5 @@
+gcc    -fPIC -Wall -O2 -Iarm-include -c pcam.c
+gcc    -fPIC -Wall -O2 -Iarm-include -c pfluke2.c
+gcc    -fPIC -Wall -O2 -Iarm-include -c pgpio.c
+gcc    -fPIC -Wall -O2 -Iarm-include -c pmisc.c
+gcc    -shared -Wall -o phyro.so  pfluke2.o pgpio.o pcam.o pmisc.o -ljpeg -lm 
