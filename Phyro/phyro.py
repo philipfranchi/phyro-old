@@ -284,7 +284,9 @@ def playIntroSongForMePls():
 	beep(.375,475)
 	beep(1,500)
 	flushBuffer()
-
+############
+#Movement
+############
 def motors(leftValue, rightValue):
 	"""
 	Move function that takes desired motor values
@@ -343,7 +345,9 @@ def turnLeft(spee, timeout = None):
 	ret = move(0, speed)
 	if(timeout != None):
 		time.sleep(timeout)
-
+############
+#Beep
+############
 def beep(duration, frequency1, frequency2=None):
 	if type(duration) in [tuple, list]:
 		frequency2 = frequency1
@@ -377,7 +381,9 @@ def writeBeep(dur, _freq1, _freq2):
 		wRet =	writer.write([SET_SPEAKER_2,duration >> 8,duration % 256,freq1 >> 8,freq1 % 256,freq2 >> 8,freq2 % 256])
 		writer.read(PACKET_LENGTH + 11)
 	return wRet
-
+############
+#GET
+############
 def get(sensor = "all", *position):
 	sensor = sensor.lower()
 	if(sensor == "config"):
@@ -398,7 +404,7 @@ def get(sensor = "all", *position):
 		c = string.join([chr(x) for x in c if "0" <= chr(x) <= "z"], '').strip()
 		return c
 	elif(sensor == "volume"):
-		return scrib.volume
+		return scrib._volume
 
 	elif(sensor == "battery"):
 		#returns a float
@@ -435,6 +441,10 @@ def get(sensor = "all", *position):
 			else:
 				raise ("invalid sensor name: '%s'" % sensor)
 
+def identifyRobot():
+	writer.write([GET_ROBOT_ID])
+	ret = writer.read(PACKET_LENGTH + 11)
+	return ret
 
 def getAll():
 	writer.write([GET_ALL])
@@ -442,11 +452,6 @@ def getAll():
 
 def getBattery():
 	return writer.fluke_get_battery()
-
-def identifyRobot():
-	writer.write([GET_ROBOT_ID])
-	ret = writer.read(PACKET_LENGTH + 11)
-	return ret
 
 def getIR():
 	writer.write([GET_IR_ALL])
@@ -482,7 +487,9 @@ def getBright(window = None):
 	lbyte = (writer.read(1)[0])
 	lbyte = (hbyte << 16)| (mbyte << 8) | lbyte
 	return lbyte
-
+############
+#SET
+############
 def set(item, position, value = None):
 	item = item.lower()
 	if item == "led":
@@ -552,7 +559,12 @@ def set(item, position, value = None):
 		return setForwardness(position)
 	else:
 		raise ("invalid set item name: '%s'" % item)
+		
+def setLED(position,value):
+	return set("led",position,value)
 
+def setVolume(value):
+	return set("volume",value)
 
 def setLEDFront(value):
 	writer.setLEDFront(value)
