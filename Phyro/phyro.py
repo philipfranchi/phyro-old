@@ -105,11 +105,12 @@ GET_ROBOT_ID=156
 
 
 #library_path = "/home/phil/Work/Phyro/phyroC.so"
-library_path = "/root/test/phyro.so"
+library_path = "/root/test/phyroC.so"
 debug = True
 
 class Scribbler:
 	def __init__(self):	
+		self._volume = 0
 		self._lastTranslate = 0
 		self._lastRotate = 0
 		self._lastSensors = []
@@ -244,13 +245,20 @@ class Writer:
 			self.serialLib.fluke_get_ir_center(buf)	
 		elif value in ["right", 2]:
 			self.serialLib.fluke_get_ir_right(buf)
-		hbyte = buf[0]
-		lbyte = buf[1]
+		hbyte = ord(buf[0])
+		lbyte = ord(buf[1])
 		lbyte = (hbyte << 8) | lbyte
 		return int(lbyte)
 
 	def fluke_get_battery(self):
-			return int(self.serialLib.fluke_get_battery())/ 20.9813
+		return int(self.serialLib.fluke_get_battery())/ 20.9813
+
+	def setWhiteBalance(self,pos):		
+		if(isTrue(pos)):
+			self.serialLib.fluke_white_balance_on()
+		else:
+			self.serialLib.fluke_white_balance_off()
+
 
 def init(serial_port):
 
@@ -259,6 +267,23 @@ def init(serial_port):
 
 	writer = Writer(serial_port)
 	scrib = Scribbler()
+	playIntroSongForMePls()
+
+def playIntroSongForMePls():
+	beep(.75,500)
+	beep(.01,1)
+	beep(.75,500)
+	beep(.01,1)
+	beep(.75,500)
+
+	beep(.75,600)
+	beep(.375,550)
+	beep(.375,550)
+	beep(.375,500)
+	beep(.375,500)
+	beep(.375,475)
+	beep(1,500)
+	flushBuffer()
 
 def motors(leftValue, rightValue):
 	"""
@@ -307,7 +332,7 @@ def adjustSpeed():
 
 	DEBUG("		Adjust Speed called with values "+ str(left) + " , " + str(right))
 	writer.write([SET_MOTORS, int(rightPower), int(leftPower)])
-	writer.read(PACKET_LENGTH)
+	writer.read(PACKET_LENGTH + 11)
 
 def turnRight(speed, timeout = None):
 	ret = move(0,-speed)
@@ -335,10 +360,11 @@ def beep(duration, frequency1, frequency2=None):
 		if frequency2 == None:
 			frequency2 = [None for i in range(len(frequency1))]
 		for (f1, f2) in zip(frequency1, frequency2):
-			return writeBeep(duration, f1, f2)
+			ret = writeBeep(duration, f1, f2)
 	else:
-		return writeBeep(duration, frequency1, frequency2)
-
+		ret = writeBeep(duration, frequency1, frequency2)
+	wait(duration)
+	return ret
 def writeBeep(dur, _freq1, _freq2):
 	duration = int(dur*1000)
 	freq1 = int(_freq1)
@@ -346,8 +372,10 @@ def writeBeep(dur, _freq1, _freq2):
 		freq2 = int(_freq2)
 	if(_freq2 == None):
 		wRet =	writer.write([SET_SPEAKER,duration >> 8,duration % 256,freq1 >> 8,freq1 % 256])
+		writer.read(PACKET_LENGTH+11)
 	else:
 		wRet =	writer.write([SET_SPEAKER_2,duration >> 8,duration % 256,freq1 >> 8,freq1 % 256,freq2 >> 8,freq2 % 256])
+		writer.read(PACKET_LENGTH + 11)
 	return wRet
 
 def get(sensor = "all", *position):
@@ -383,7 +411,7 @@ def get(sensor = "all", *position):
 		if(len(position)==0):
 			if(sensor == "light"):
 				#returns a 3 tuple
-				return _get(GET_LIGHT_ALL, 6, "word")
+				return (getBright("left"), getBright("middle"), getBright("right"))
 			elif(sensor == "line"):
 				#returns a 2 tuple
 				return _get(GET_LINE_ALL, 2)
@@ -410,108 +438,125 @@ def get(sensor = "all", *position):
 
 def getAll():
 	writer.write([GET_ALL])
-	return writer.read(20)
+	return writer.read(PACKET_LENGTH + 11)
 
 def getBattery():
 	return writer.fluke_get_battery()
 
 def identifyRobot():
 	writer.write([GET_ROBOT_ID])
-	writer.read(PACKET_LENGTH + 11)
+	ret = writer.read(PACKET_LENGTH + 11)
 	return ret
 
 def getIR():
 	writer.write([GET_IR_ALL])
-	writer.read(PACKET_LENGTH)
-	return writer.read(2)
+	ret = writer.read(PACKET_LENGTH+2)
+	return [ret[9],ret[10]]
 
 def getObstacle(value=None):
 	return writer.getObstacle(value)
 
+def getBlob(*args):
+	return 0
+
+def getBright(window = None):
+	if(window == None or window == "all"):
+		return get("bright")
+	if(type(window) == str):
+		if(window in "left"):
+			window = 0
+		elif(window in ["middle","center"]):
+			window = 1
+		elif(window in "right"):
+			window = 2
+	writer.write([GET_WINDOW_LIGHT,2])
+	writer.read(PACKET_LENGTH)
+	hbyte = (writer.read(1)[0])
+	mbyte = (writer.read(1)[0])
+	lbyte = (writer.read(1)[0])
+	lbyte = (hbyte << 16)| (mbyte << 8) | lbyte
+	return lbyte
+
 def set(item, position, value = None):
-			item = item.lower()
-			if item == "led":
-				if type(position) in [int, float]:
-					if position == 0:
-						if isTrue(value): return _set(SET_LED_LEFT_ON)
-						else:				 return _set(SET_LED_LEFT_OFF)
-					elif position == 1:
-						if isTrue(value): return _set(SET_LED_CENTER_ON)
-						else:				 return _set(SET_LED_CENTER_OFF)
-					elif position == 2:
-						if isTrue(value): return _set(SET_LED_RIGHT_ON)
-						else:				 return _set(SET_LED_RIGHT_OFF)
-					else:
-						raise AttributeError("no such LED: '%s'" % position)
+	item = item.lower()
+	if item == "led":
+		if type(position) in [int, float]:
+			if position == 0:
+				if isTrue(value):
+					return _set(SET_LED_LEFT_ON)
+				else:				 
+					return _set(SET_LED_LEFT_OFF)
+			elif position == 1:
+				if isTrue(value):
+					return _set(SET_LED_CENTER_ON)
 				else:
-					position = position.lower()
-					if position == "center":
-						if isTrue(value): return _set(SET_LED_CENTER_ON)
-						else:				 return _set(SET_LED_CENTER_OFF)
-					elif position == "left":
-						if isTrue(value): return _set(SET_LED_LEFT_ON)
-						else:				 return _set(SET_LED_LEFT_OFF)
-					elif position == "right":
-						if isTrue(value): return _set(SET_LED_RIGHT_ON)
-						else:				 return _set(SET_LED_RIGHT_OFF)
-					elif position == "front":
-						return setLEDFront(value)
-					elif position == "back":
-						return setLEDBack(value)
-					elif position == "all":
-						if isTrue(value): return _set(SET_LED_ALL_ON)
-						else:				 return _set(SET_LED_ALL_OFF)
-					else:
-						raise AttributeError("no such LED: '%s'" % position)
-			elif item == "name":
-				position = position + (" " * 16)
-				name1 = position[:8].strip()
-				name1_raw = map(lambda x:  ord(x), name1)
-				name2 = position[8:16].strip()
-				name2_raw = map(lambda x:  ord(x), name2)
-				_set(*([SET_NAME1] + name1_raw))
-				_set(*([SET_NAME2] + name2_raw))
-			elif item == "password":
-				position = position + (" " * 16)
-				pass1 = position[:8].strip()
-				pass1_raw = map(lambda x:  ord(x), pass1)
-				pass2 = position[8:16].strip()
-				pass2_raw = map(lambda x:  ord(x), pass2)
-				_set(*([SET_PASS1] + pass1_raw))
-				_set(*([SET_PASS2] + pass2_raw))
-			elif item == "whitebalance":
-				setWhiteBalance(position)
-			elif item == "irpower":
-				setIRPower(position)
-			elif item == "volume":
-				if isTrue(position):
-					_volume = 1
-					return _set(SET_LOUD)
+					return _set(SET_LED_CENTER_OFF)	
+			elif position == 2:
+				if isTrue(value):
+					return _set(SET_LED_RIGHT_ON)
 				else:
-					_volume = 0
-					return _set(SET_QUIET)
-			elif item == "startsong":
-				startsong = position
-			elif item == "echomode":
-				return setEchoMode(position)
-			elif item == "data":
-				return setData(position, value)
-			elif item == "password":
-				return setPassword(position)
-			elif item == "forwardness":
-				return setForwardness(position)
+					return _set(SET_LED_RIGHT_OFF)
 			else:
-				raise ("invalid set item name: '%s'" % item)
+				raise AttributeError("no such LED: '%s'" % position)
+		else:
+			position = position.lower()
+			if position == "center":
+				if isTrue(value):
+					return _set(SET_LED_CENTER_ON)
+				else:
+					return _set(SET_LED_CENTER_OFF)
+			elif position == "left":
+				if isTrue(value):
+					return _set(SET_LED_LEFT_ON)
+				else:
+					return _set(SET_LED_LEFT_OFF)
+			elif position == "right":
+				if isTrue(value):
+					return _set(SET_LED_RIGHT_ON)
+				else:
+					return _set(SET_LED_RIGHT_OFF)
+			elif position == "front":
+				return setLEDFront(value)
+			elif position == "back":
+				return setLEDBack(value)
+			elif position == "all":
+				if isTrue(value):
+					return _set(SET_LED_ALL_ON)
+				else:
+					return _set(SET_LED_ALL_OFF)
+			else:
+				raise AttributeError("no such LED: '%s'" % position)
+	elif item == "whitebalance":
+		setWhiteBalance(position)
+	elif item == "irpower":
+		setIRPower(position)
+	elif item == "volume":
+		if isTrue(position):
+			scrib._volume = 1
+			return _set(SET_LOUD)
+		else:
+			scrib._volume = 0
+			return _set(SET_QUIET)
+	elif item == "data":
+		return setData(position, value)
+		#Not implimented
+	elif item == "password":
+		return setPassword(position)
+	elif item == "forwardness":
+		return setForwardness(position)
+	else:
+		raise ("invalid set item name: '%s'" % item)
 
 
 def setLEDFront(value):
 	writer.setLEDFront(value)
 
 def setLEDBack(value):
-		writer.setLEDBack(value)
+	writer.setLEDBack(value)
 
 def setWhiteBalance(pos):
-	DEBUG(str(pos))
+	writer.setWhiteBalance(pos)
+
 def setIRPower(pos):
 	DEBUG(str(pos))
 def setEchoMode(pos):
@@ -520,6 +565,7 @@ def setPassword(pos):
 	DEBUG(str(pos))
 def setForwardness(pos):
 	DEBUG("NOT YET IMPLIMENTED")
+
 #Python only functions
 #------------------------------
 
@@ -587,9 +633,19 @@ def _get(value, bytes = 1, mode = "byte"):
 		return retval
 
 def _set(values):
-	writer.write([values],len(values))
-	test = writer.read(PACKET_LENGTH) # read echo
-	_lastSensors = writer.read(11) # single bit sensors
+	writer.write([values],len([values]))
+	test = writer.read(PACKET_LENGTH + 11) # read echo
+	_lastSensors = test[9:] # single bit sensors
+
+def isTrue(value):
+	"""
+	Returns True if value is something we consider to be "on".
+	Otherwise, return False.
+	"""
+	if type(value) == str:
+		return (value.lower() == "on")
+	elif value: return True
+	return False
 
 def DEBUG(s):
 	if(debug):

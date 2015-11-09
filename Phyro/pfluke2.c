@@ -294,16 +294,16 @@ int read_port(char* buf, int size, int fd){
         while(numRead < size){
                 ret = read( fd, buf+numRead, size-numRead);
                 if(ret <= 0){
-                        printf("Read returned %d with error %d: %s\n",ret,errno,strerror(errno));
+                        //printf("Read returned %d with error %d: %s\n",ret,errno,strerror(errno));
                         timer++;
-                        if(timer>100){
+                        if(timer>10000){
                                 return -1;
                         }
                 }
                 else{
                         numRead += ret;
                         timer = 0;
-                        printf("%d Bytes read now for a total of %d with %d left to read\n",ret,numRead,size-numRead);
+                        //printf("%d Bytes read now for a total of %d with %d left to read\n",ret,numRead,size-numRead);
                 }
         }
         return numRead-size;
