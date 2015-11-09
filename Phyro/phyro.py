@@ -453,6 +453,12 @@ def getIR():
 	ret = writer.read(PACKET_LENGTH+2)
 	return [ret[9],ret[10]]
 
+def getLight(*pos):
+	return get("light",*pos)
+
+def getLine(*pos):
+	return get("line",*pos)
+
 def getObstacle(value=None):
 	return writer.getObstacle(value)
 
