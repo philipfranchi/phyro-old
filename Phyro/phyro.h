@@ -11,6 +11,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/mman.h>
+#include <signal.h>
+#include <poll.h>
 
 #define SCRIBBLER_IN_LENGTH 9
 #define SCRIBBLER_OUT_LENGTH 11
@@ -149,9 +152,9 @@ int errorlog_pos;
 
 // functions in fluke2.c
 int fluke_get_errors(char* buf);
-int fluke_get_image();
+int fluke_get_image(char * buf);
 int fluke_get_ir_left(char * buf);
-int fluke_get_ir_center(char * buf);
+int fluke_get_ir_center();
 int fluke_get_ir_right(char * buf);
 int fluke_get_battery();
 int fluke_get_blob();
@@ -199,4 +202,3 @@ void image_rgb2yuv(unsigned char *rgb);
 void image_rgb2vyuy(unsigned char *rgb);
 void yuv2rgb(unsigned char *r, unsigned char *g, unsigned char *b,unsigned char y, unsigned char u, unsigned char v);
 
-//phyroC.c
